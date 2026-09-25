@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         指挥官能飞！自动小游戏（每日 3 次）
 // @namespace    local.gf2.zhgnf
-// @version      1.4.0
+// @version      1.5.0
 // @description  自动运行小游戏并自动抽取普通奖励；每天最多运行 3 次，实物收货确认保留手动操作。
 // @match        https://gf2.sunborngame.com/zhgnf/index*
 // @match        https://gf2.sunborngame.com/zhgnf/game*
@@ -14,6 +14,7 @@
   'use strict';
 
   const MAX_DAILY_RUNS = 3;
+  const SCRIPT_VERSION = '1.5.0';
   const CLICK_INTERVAL = 180; // 必须小于游戏要求的 500ms
   const START_DELAY = 3400; // 游戏有 3 秒倒计时，留出少量余量
   const RETRY_DELAY = 1200; // 等待结算画面稳定后再点“再试一次”
@@ -232,6 +233,17 @@
     return true;
   }
 
+  function goToLotteryCenter() {
+    if (stoppedByUser || !/\/zhgnf\/game(?:\/|$)/.test(window.location.pathname)) return;
+    const prizeButton = document.querySelector('button.prize-btn');
+    if (prizeButton && clickElement(prizeButton)) {
+      setState('三局完成，正在进入抽奖中心');
+      return;
+    }
+    setState('等待奖品中心按钮');
+    nextButtonTimer = window.setTimeout(goToLotteryCenter, 500);
+  }
+
   function beginClickPump() {
     if (!activeRun || stoppedByUser) return;
     const touchArea = document.querySelector('.touch-area');
@@ -253,7 +265,11 @@
         const finishedManualRun = manualRun;
         manualRun = false;
         setState(finishedManualRun ? '手动测试完成（不计次数）' : (attempts >= MAX_DAILY_RUNS ? '今日 3 次已完成' : '本次完成，准备下一次'));
-        if (!finishedManualRun) nextButtonTimer = window.setTimeout(orchestrate, RETRY_DELAY);
+        if (!finishedManualRun) {
+          nextButtonTimer = attempts >= MAX_DAILY_RUNS
+            ? window.setTimeout(goToLotteryCenter, RETRY_DELAY)
+            : window.setTimeout(orchestrate, RETRY_DELAY);
+        }
         return;
       }
 
@@ -327,12 +343,12 @@
     const panel = document.createElement('div');
     panel.id = 'gf2-auto-play-panel';
     panel.innerHTML = isLotteryRoute() ? `
-      <div class="gf2-auto-title">指挥官能飞 · 自动抽奖</div>
+      <div class="gf2-auto-title">指挥官能飞 · 自动抽奖 v${SCRIPT_VERSION}</div>
       <div class="gf2-auto-status"></div>
       <button type="button" class="gf2-lottery-start">开始自动抽奖</button>
       <button type="button" class="gf2-auto-stop">停止</button>
     ` : `
-      <div class="gf2-auto-title">指挥官能飞 · 自动操作</div>
+      <div class="gf2-auto-title">指挥官能飞 · 自动操作 v${SCRIPT_VERSION}</div>
       <div class="gf2-auto-status"></div>
       <button type="button" class="gf2-auto-again">手动再来一局（不计次）</button>
       <button type="button" class="gf2-auto-stop">停止</button>
